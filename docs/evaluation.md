@@ -121,19 +121,50 @@ resnet18 costs little, and on this evidence it costs 0.12 tile AUROC.
 selection. Justifies the 10% of ADR-010, which deviates from the paper's 1%
 because our fit set is 30 images rather than hundreds.
 
-| Coreset % | Method | Bank size | Image AUROC | ms/tile | Fit time |
-|---|---|---|---|---|---|
-| 1 | greedy | — | — | — | — |
-| 5 | greedy | — | — | — | — |
-| 10 | greedy | 1200 | **0.9615** | — | 3.6 s |
-| 25 | greedy | — | — | — | — |
-| 100 | none | — | — | — | — |
-| 10 | random | 1200 | **0.9254** | — | 1.1 s |
+**Ran 2026-09-04** on AITEX, six fabrics, 30 fit tiles each — the same harness
+as sections 2, 4, 6 and 7, so these numbers sit on one scale with them. Latency
+is CPU.
 
-The greedy/random pair is measured (carpet, 30 images, identical bank size, only
-the selection differs): **greedy is worth 3.6 AUROC points** and costs 2.5 s.
-That prices ADR-010's documented fallback rather than assuming it, and it is why
-greedy stays the default below the ~50-tile point where it becomes quadratic.
+| Coreset % | Method | Bank size | Tile AUROC | Pixel AUROC | Fit time | CPU ms/tile |
+|---|---|---|---|---|---|---|
+| 1% | greedy | 120 | 0.8515 | 0.9473 | 1.1 s | 37 |
+| 1% | random | 120 | 0.7712 | 0.9299 | 0.8 s | 38 |
+| 5% | greedy | 600 | **0.8711** | 0.9647 | 1.2 s | 39 |
+| 5% | random | 600 | 0.7705 | 0.9476 | 0.7 s | 39 |
+| 10% | greedy | 1200 | 0.8588 | 0.9710 | 1.6 s | 40 |
+| 10% | random | 1200 | 0.7737 | 0.9554 | 0.6 s | 38 |
+| 25% | greedy | 3000 | 0.8346 | 0.9679 | 2.8 s | 40 |
+| 25% | random | 3000 | 0.8251 | 0.9636 | 0.6 s | 38 |
+| 100% | none | 12000 | 0.8164 | 0.9677 | 0.6 s | 54 |
+
+**Two findings, and the first one is not what the ablation was designed to
+check.**
+
+**1. More bank is worse.** Accuracy does not rise with the coreset fraction — it
+peaks around 5% (0.8711) and then falls, and the **full bank is the worst
+configuration tested** (0.8164, -0.0547 against the peak). Keeping every
+patch embedding means keeping the nuisance variation along with the signal, so
+an anomalous patch finds a near neighbour among memorised clutter and scores
+low. The coreset is doing denoising, not just compression, which is a stronger
+claim for it than ADR-010 ever made.
+
+**2. Greedy beats random wherever the bank is small enough to matter**:
+1% +0.0804, 5% +0.1006, 10% +0.0851, 25% +0.0095. The advantage is large from
+1–10% and collapses at 25%, which is what you would expect — once you keep a
+quarter of the embeddings, *which* quarter stops mattering. That reproduces the
+direction of the MVTec result in `reproduction.csv` (+3.6 points on carpet) on a
+second dataset, and it is what keeps k-center the default.
+
+**The fraction is not the latency knob it was assumed to be.** CPU cost is flat
+at 37–40 ms/tile from 1% to 25% and only moves at the full bank
+(54 ms). Brute-force nearest neighbour over a few thousand 128-d points is
+cheap next to the backbone forward pass (ADR-011), so shrinking the bank buys
+artifact size, not speed.
+
+**Caveat, and it is a real one.** Six fabrics, sd ≈ 0.10 across them, so
+differences below roughly 0.03 tile AUROC are not separable — that covers the
+1% / 5% / 10% cluster entirely. What survives the noise is the direction of the
+greedy/random gap and the decline at 100%, not the exact location of the peak.
 
 → `results/coreset_ablation.csv`
 

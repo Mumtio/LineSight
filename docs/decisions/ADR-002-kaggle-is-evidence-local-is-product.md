@@ -59,7 +59,23 @@ evidence that exists was produced under it:
 | AITEX cross-construction | `probes/p12_aitex_generalisation.py` | `results/aitex_generalisation.csv` |
 | Ten Fabrics benchmark | published Kaggle notebook (`results/README.md`) | `results/tfd_summary.json`, `tfd_per_fabric.csv` |
 
-The studies the notebook would have carried and nothing else does — the backbone
-ablation, the normal-set size sweep, the supervised U-Net comparison and the
-calibration curve — are **unmeasured**, and `docs/evaluation.md` marks them as
-study design rather than as results.
+The studies the notebook would have carried were rebuilt as probes and **ran on
+2026-09-04**, on local hardware rather than on Kaggle:
+
+| Study | Produced by | Artifact |
+|---|---|---|
+| Backbone ablation | `probes/p15_backbone_ablation.py` | `results/backbone_ablation.csv` |
+| Normal-set size sweep | `probes/p16_normal_set_sweep.py` | `results/normal_set_sweep.csv` |
+| Calibration curve | `probes/p17_calibration_curve.py` | `results/calibration.csv` |
+| Supervised U-Net baseline | `probes/p18_unet_baseline.py` | `results/baseline_comparison.csv`, `unet_history.csv` |
+| Coreset fraction sweep | `probes/p19_coreset_ablation.py` | `results/coreset_ablation.csv` |
+
+They run on AITEX rather than MVTec, which is a deviation from the original
+design and is recorded as one: MVTec stays on Kaggle under ADR-003, and AITEX is
+the more relevant fabric benchmark in any case. All five reuse the split and
+AUROC helpers from `p12`, so their numbers sit on one scale with the results
+already published.
+
+This vindicates the split rather than undermining it. The evidence work still
+never touched the deployment path, and it turned out not to need a hosted
+session at all — which is the same argument ADR-002 makes about the product.
