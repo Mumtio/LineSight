@@ -1,0 +1,25 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Datasets are fetched, never committed (see scripts/fetch_data.sh)
+data/
+# Fitted memory banks are artifacts; commit only the demo SKU deliberately
+banks/*.npz
+# Generated evidence. Subdirectories need their own rule: results/*.png
+# matches only the top level, so evidence crops slipped past it.
+results/*.pdf
+results/*.png
+results/evidence/
+results/evidence_bench/
+*.db
+
+# Never commit credentials
+.env
+*.env
+kaggle.json

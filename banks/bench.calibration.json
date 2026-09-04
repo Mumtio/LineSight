@@ -1,0 +1,9 @@
+{
+  "threshold": 17.247243881225586,
+  "abstain_low": 16.260196685791016,
+  "budget_fa_per_100m": 40.0,
+  "metres_per_tile": 0.015010136895739717,
+  "n_clean_tiles": 2880,
+  "sku": "bench",
+  "fit_timestamp": "2026-09-03T18:14:11+00:00"
+}

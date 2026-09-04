@@ -1,0 +1,66 @@
+# Fabric Stain -- the phone-resolution SKU.
+#
+# Dataset SKU, kept for the Fabric Stain benchmark referenced in
+# docs/datasets.md. The live rig uses configs/sku_bench.yaml.
+#
+# Read this against configs/default.yaml: only the keys that differ appear here,
+# and each difference is a property of 1920x1080 camera imagery rather than a
+# preference.
+#
+
+sku: fabric_stain
+
+acquisition:
+  source_type: mjpeg
+  uri: http://127.0.0.1:8090/video
+  # The backbone costs ~130 ms/frame on CPU. At 120 mm/s and 12 fps the fabric
+  # advances 10 mm per frame and tiles overlap by 64 px, so there is plenty of
+  # temporal redundancy to spend. STATED, not hidden -- it is on the UI.
+  frame_stride: 2
+  # Finite source (a recording): take every frame in
+  # order rather than only the newest. On a real line leave this TRUE -- the
+  # fabric does not wait, and falling behind mislocates every defect.
+  drop_stale: false
+
+geometry:
+  # DICT_4X4_50 holds 50 markers = only 5 m of roll at 100 mm pitch.
+  # DICT_5X5_1000 covers 100 m, which is a real roll.
+  aruco_dict: DICT_5X5_1000
+  marker_length_mm: 40.0     # must match the printed tape
+  marker_pitch_mm: 100.0
+  roi: null                  # let the marker band define the fabric ROI
+  max_gap_mm: 250.0
+  max_gap_s: 3.0
+
+preprocess:
+  flatfield: true            # phone-like imagery, unlike AITEX's flat scans
+  flatfield_sigma_px: 151.0
+  tile_size: 512
+  tile_overlap: 64
+
+detect:
+  backbone: resnet18
+  input_size: 256            # 320 -> 256 buys ~35% latency for the live loop
+  n_normal_tiles: 30
+  coreset_method: greedy
+  batch_size: 8
+
+calibration:
+  # 68 defect-free images at 512 px tiles is a modest clean sample, and the
+  # sample-size guard in calibrate/threshold.py refuses any budget it cannot
+  # resolve. 40 FA/100 m is what this sample supports; tighten it only with
+  # more clean fabric, and let the guard say how much more is needed.
+  budget_fa_per_100m: 40.0
+  stability_margin: 10
+
+events:
+  min_area_px: 400           # 1920-wide frames: ignore speckle below ~20x20 px
+  min_length_mm: 3.0
+  track_iou_threshold: 0.2
+  track_join_mm: 60.0
+
+scoring:
+  # The simulated web is 1173 px of fabric at ~0.5 mm/px.
+  roll_width_m: 0.586
+  hold_points_per_100yd2: 20.0
+  reject_points_per_100yd2: 40.0

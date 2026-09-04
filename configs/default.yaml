@@ -1,0 +1,80 @@
+# LineSight base configuration.
+#
+# Every tunable in the system lives in a file like this one. No module reads a
+# magic number from its own source, so two runs can be compared by diffing two
+# configs, and every fitted bank records the config it was built under.
+#
+# A SKU file (configs/sku_*.yaml) overrides only the keys it cares about;
+# load_config() merges it over this.
+
+sku: default
+seed: 0
+
+# L1 ACQUISITION -- a folder, a video file, or a live camera (ADR-006).
+acquisition:
+  source_type: directory      # directory | video | mjpeg
+  uri: ""
+  glob: "*.png"
+  frame_stride: 1             # every Nth frame; published with the latency table
+  loop: false
+
+# L2 GEOMETRY -- ArUco markers on the position tape (ADR-005).
+geometry:
+  aruco_dict: DICT_4X4_50
+  marker_length_mm: 40.0      # >= 40 mm, printed matte: smaller or glossy fails to decode
+  marker_pitch_mm: 100.0
+  roi: null                   # null = full frame; [x, y, w, h] to fix it
+  fallback_speed_mm_per_s: null   # set ONLY as a declared bench simplification
+  max_gap_mm: 250.0           # beyond this without a marker -> gap_warning
+
+# L3 PREPROCESS
+preprocess:
+  flatfield: true             # first thing to check when the heatmap is noise
+  flatfield_sigma_px: 101.0   # >> defect size, << lighting gradient
+  tile_size: 512
+  tile_overlap: 64
+  drop_partial_edge_tiles: false
+
+# L4 DETECTION -- PatchCore. Every value here is asserted into the saved bank's
+# metadata, so a bank cannot be loaded under a configuration it was not fitted under.
+detect:
+  scorer: patchcore           # patchcore | stub | unet
+  backbone: resnet18          # 384-dim vs WideResNet-50's 1536; ~4x faster on CPU
+  layers: [layer2, layer3]    # layer1 too texture-local, layer4 too semantic
+  input_size: 320             # layer3 grid 20x20 = 400 patches/tile
+  neighbourhood_pool: 3       # 3x3 avg, stride 1
+  projection_dim: 128         # Johnson-Lindenstrauss 384 -> 128
+  coreset_frac: 0.10          # 10%, not the paper's 1% -- see ADR-010
+  coreset_method: greedy      # greedy | random (documented fallback)
+  coreset_seed: 0
+  n_normal_tiles: 30          # cold-start target: one SKU from ~30 clean tiles
+  smooth_sigma_px: 4.0
+  batch_size: 12              # all tiles of one frame in one forward pass
+  device: auto
+  bank_dir: banks
+
+# L5 CALIBRATION -- the operator sets a budget, not a threshold.
+calibration:
+  budget_fa_per_100m: 1.0
+  abstain_multiplier: 5.0
+  clean_scores_path: null
+
+# L6 EVENT ASSEMBLY
+events:
+  min_area_px: 64             # below the stated resolution -> not a claim
+  min_length_mm: 1.0
+  track_iou_threshold: 0.2
+  track_max_gap_frames: 2
+
+# L7 SCORING -- ASTM D5430. The bands are a customer contract, not the standard.
+scoring:
+  roll_width_m: 1.5
+  hold_points_per_100yd2: 20.0
+  reject_points_per_100yd2: 40.0
+
+# L8 PRODUCT
+api:
+  host: 127.0.0.1
+  port: 8000
+  db_path: linesight.db
+  evidence_dir: results/evidence

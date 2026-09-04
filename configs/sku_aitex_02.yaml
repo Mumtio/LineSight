@@ -1,0 +1,34 @@
+# AITEX fabric structure 02 -- the reference SKU for an offline, file-based run.
+#
+#   linesight fit       --sku aitex_02 --normal data/aitex/normal_02/
+#   linesight calibrate --sku aitex_02 --clean  data/aitex/clean_02/
+#   linesight run       --sku aitex_02 --source data/aitex/roll_02/
+#
+# AITEX strips are 4096x256, so the tiles are 256 px, not the 512 px used for
+# phone frames. The bank does not care -- everything is resized to the backbone
+# input -- but the tiler and the metres-per-tile arithmetic do.
+
+sku: aitex_02
+
+acquisition:
+  source_type: directory
+  uri: data/aitex/roll_02
+  glob: "*.png"               # AITEX masks are *_mask.png; keep them out of the roll dir
+
+geometry:
+  # AITEX is scanned imagery with no markers and no rig. Position is synthesised
+  # from a constant advance per strip. This is a bench simplification and is
+  # stated as one in the report rather than presented as measurement.
+  marker_pitch_mm: 100.0
+  fallback_speed_mm_per_s: 25.0
+  max_gap_mm: 1.0e9           # no markers exist here, so gap warnings are noise
+
+preprocess:
+  tile_size: 256
+  tile_overlap: 32
+
+detect:
+  n_normal_tiles: 30
+
+scoring:
+  roll_width_m: 0.256         # a 256 px strip at ~1 mm/px

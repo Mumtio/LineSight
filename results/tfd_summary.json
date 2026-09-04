@@ -1,0 +1,13 @@
+{
+  "dataset": "Ten Fabrics Dataset (TFD)",
+  "patches": 2969,
+  "defective_patches": 737,
+  "fabrics_evaluated": 10,
+  "fit_patches_per_fabric": 30,
+  "image_auroc_mean_over_fabrics": 0.7605,
+  "image_auroc_pooled": 0.6855,
+  "block_auroc_mean_over_fabrics": 0.9137,
+  "block_auroc_pooled": 0.8549,
+  "backbone": "resnet18",
+  "device": "cpu"
+}

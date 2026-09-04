@@ -1,0 +1,13 @@
+building the roll ...
+  clean lead-in 7.98 m, roll 10.92 m
+  399 clean frames, 130 stained frames
+
+fit 133 | calibrate 133 | clean-test 133 | stained-test 130
+
+available: 798 fit tiles, 798 calibration tiles
+
+ n_fit  coreset   fit_s   thresh   FP/100m  TP found  separation
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+    30   greedy     1.8    15.11    1391.0       111        1.16x
+   150   random     3.0    14.91    1315.8        97        1.19x
+   500   random     8.8    14.47    1315.8        89        1.18x

@@ -1,0 +1,68 @@
+sku: bench
+seed: 0
+acquisition:
+  source_type: mjpeg
+  uri: http://192.168.68.100:8080/video
+  frame_stride: 2
+  glob: '*.png'
+  loop: false
+  synthetic_fps: 30.0
+  drop_stale: false
+geometry:
+  aruco_dict: DICT_5X5_1000
+  marker_length_mm: 24.0
+  marker_pitch_mm: 95.1
+  roi:
+  - 216
+  - 14
+  - 762
+  - 546
+  fallback_speed_mm_per_s: null
+  max_gap_mm: 250.0
+  max_gap_s: 3.0
+preprocess:
+  flatfield: true
+  flatfield_sigma_px: 151.0
+  tile_size: 256
+  tile_overlap: 32
+  drop_partial_edge_tiles: false
+detect:
+  scorer: patchcore
+  backbone: resnet18
+  layers:
+  - layer2
+  - layer3
+  input_size: 256
+  grid_align: coarsest
+  neighbourhood_pool: 3
+  projection_dim: 128
+  coreset_frac: 0.1
+  coreset_method: greedy
+  coreset_seed: 0
+  n_normal_tiles: 30
+  smooth_sigma_px: 4.0
+  batch_size: 8
+  device: auto
+  bank_dir: banks
+calibration:
+  budget_fa_per_100m: 40.0
+  abstain_multiplier: 5.0
+  stability_margin: 10
+  clean_scores_path: null
+events:
+  min_area_px: 400
+  min_length_mm: 3.0
+  extent_rule: half_max
+  extent_fraction: 0.5
+  track_iou_threshold: 0.2
+  track_join_mm: 60.0
+  track_max_gap_frames: 2
+scoring:
+  roll_width_m: 0.243
+  hold_points_per_100yd2: 20.0
+  reject_points_per_100yd2: 40.0
+api:
+  host: 127.0.0.1
+  port: 8000
+  db_path: linesight.db
+  evidence_dir: results\evidence

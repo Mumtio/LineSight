@@ -1,0 +1,81 @@
+# Bench rig -- phone over hand-pulled fabric, printed ArUco tape.
+#
+#   python tools/bench_run.py learn   --url http://<phone>:8080/video --sku bench
+#   ... swap the clean cloth for the sheet under test ...
+#   python tools/bench_run.py inspect --url http://<phone>:8080/video --sku bench
+#
+# Measured on this rig, 2026-09-03: 1280x720 at 29 fps, 0.351 mm/px,
+# 449 mm field of view. Cloth runs between cardboard guides with the tape
+# down the right-hand side.
+
+sku: bench
+
+acquisition:
+  source_type: mjpeg
+  uri: http://192.168.68.100:8080/video
+  # The backbone costs ~150 ms/frame on this laptop. Hand-pulled fabric moves
+  # slowly enough that every second frame is ample coverage. Stated, not hidden.
+  frame_stride: 2
+  drop_stale: false
+
+geometry:
+  aruco_dict: DICT_5X5_1000
+  # Measured off the printed tape with a steel ruler. The tape printed at ~96%
+  # of nominal, and the config describes the tape rather than the design.
+  marker_length_mm: 24.0
+  marker_pitch_mm: 95.1
+  # EXPLICIT. Auto-inference needs two markers to tell which axis the tape runs
+  # along; at this working distance only 176 mm of roll is visible against a
+  # 95.1 mm pitch, so often only one marker is in shot. A lone marker is roughly
+  # square, the axis test is a coin toss, and it kept the full width with the
+  # tape INSIDE the scored region.
+  #
+  # Set from the rig as it now stands: a cardboard light box with LED strips
+  # down both sides, cloth in the middle, tape on the right. The box excludes
+  # all four intruders - the guides and LEDs at the sides, the cardboard lip
+  # along the bottom (which starts at y 575), and the tape at x 1034.
+  #
+  # Every one of those would otherwise be scored. On the first real run the
+  # tape drifted into the scored region and produced thirteen detections that
+  # were all markers, which is why this is pinned rather than inferred.
+  roi: [216, 14, 762, 546]
+  max_gap_mm: 250.0
+  max_gap_s: 3.0
+
+preprocess:
+  flatfield: true
+  flatfield_sigma_px: 151.0
+  # 575 px of fabric will not yield a 512 px tile with 64 px overlap on both
+  # axes, so tiles are smaller here than on the simulated SKU.
+  tile_size: 256
+  tile_overlap: 32
+
+detect:
+  backbone: resnet18
+  input_size: 256
+  n_normal_tiles: 30
+  coreset_method: greedy
+  batch_size: 8
+
+calibration:
+  # Start loose. The guard will refuse anything the clean sample cannot support
+  # and will say how much fabric it needs -- do not argue with it, and do not
+  # tighten this until there is more clean cloth to calibrate on.
+  budget_fa_per_100m: 40.0
+  stability_margin: 10
+
+events:
+  # 0.459 mm/px, so 400 px is roughly a 9 mm blob. Below the stated spatial
+  # resolution the system is not making a claim.
+  min_area_px: 400
+  min_length_mm: 3.0
+  track_iou_threshold: 0.2
+  track_join_mm: 60.0
+
+scoring:
+  # The INSPECTED width, not the bolt width: 762 px of ROI at 0.320 mm/px.
+  # points_per_100yd2 divides by this, so it decides the verdict. Re-measure it
+  # with a ruler if the framing changes.
+  roll_width_m: 0.243
+  hold_points_per_100yd2: 20.0
+  reject_points_per_100yd2: 40.0

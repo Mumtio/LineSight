@@ -1,0 +1,9 @@
+{
+  "threshold": 15.082780838012695,
+  "abstain_low": 12.401413917541504,
+  "budget_fa_per_100m": 20.0,
+  "metres_per_tile": 0.448,
+  "n_clean_tiles": 960,
+  "sku": "fabric_stain",
+  "fit_timestamp": "2026-08-31T21:24:10+00:00"
+}

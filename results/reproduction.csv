@@ -1,0 +1,10 @@
+category,n_fit,coreset_frac,coreset_method,bank_size,input_size,image_auroc,pixel_auroc,published_image_auroc,separation_vs_clean_max,fit_s,score_s,n_test,n_anomalous,configuration
+carpet,30,0.1,greedy,1200,320,0.9615,0.9857,0.98,1.545,2.0,8.4,117,89,product
+carpet,30,0.1,random,1200,320,0.9254,0.9834,0.98,1.445,1.1,8.9,117,89,product-random
+carpet,280,0.01,random,1120,320,0.9033,0.9832,0.98,1.373,2.9,8.4,117,89,paper-like
+grid,30,0.1,greedy,1200,320,0.5522,0.8566,0.98,0.879,2.0,3.7,78,57,product
+grid,30,0.1,random,1200,320,0.4745,0.8176,0.98,0.857,0.9,3.6,78,57,product-random
+grid,264,0.01,random,1056,320,0.4678,0.8776,0.98,0.894,2.8,5.5,78,57,paper-like
+leather,30,0.1,greedy,1200,320,0.984,0.989,1.0,1.602,1.9,8.6,124,92,product
+leather,30,0.1,random,1200,320,0.9535,0.9868,1.0,1.535,1.0,8.5,124,92,product-random
+leather,245,0.01,random,980,320,0.9365,0.9866,1.0,1.53,2.8,11.7,124,92,paper-like
