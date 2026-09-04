@@ -184,10 +184,10 @@ scales as `stability_margin / allowed_frac`; the error message says how much.
 
 ## Results
 
-> Six of the seven studies have now run in full; the coreset ablation is
-> measured for greedy-vs-random but not for the full fraction sweep. Two results
-> contradicted the specification they were meant to confirm, and are reported as
-> they came out. See
+> **All seven studies have now run.** Three of them contradicted the
+> specification they were meant to confirm — the backbone ablation, the coreset
+> sweep and the supervised baseline — and all three are reported as they came
+> out rather than reframed. See
 > [docs/evaluation.md](docs/evaluation.md) for the method, the stated
 > hypotheses, and the threats to validity.
 
@@ -202,6 +202,7 @@ scales as `stability_margin / allowed_frac`; the error message says how much.
 | Normal-set size at which AUROC flattens | **no knee by 100 tiles** — 30 captures 46% of the 5→100 gain |
 | Supervised U-Net, in-distribution / held-out fabric | 0.773 / 0.628 tile AUROC — PatchCore beats it in **both** |
 | Backbone ablation (tile AUROC, CPU ms/tile) | resnet18 0.859 @ 37 ms · wide_resnet50_2 **0.978** @ 176 ms |
+| Coreset fraction (tile AUROC) | peaks at 5% **0.871**; full bank is *worst* at 0.816; greedy beats random by +0.085 |
 | Calibration: realised / requested false-alarm rate | **0.98** over 45 resolvable cases; 18 refused as unresolvable |
 
 ## The seam

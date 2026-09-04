@@ -163,6 +163,42 @@ demonstrate, not a measured result. (Tiles were overlapped 192 px to raise the
 count, so the effective sample is smaller still and the refusal boundary above
 is optimistic.)
 
+## Coreset fraction — the bank is a denoiser, not a compromise
+
+`coreset_ablation.csv`, from `probes/p19_coreset_ablation.py`. Six AITEX
+fabrics, 30 fit tiles each, mean over the six, CPU latency.
+
+| Coreset % | Method | Bank | Tile AUROC | CPU ms/tile |
+|---|---|---|---|---|
+| 1% | greedy | 120 | 0.8515 | 37 |
+| 1% | random | 120 | 0.7712 | 38 |
+| 5% | greedy | 600 | **0.8711** | 39 |
+| 5% | random | 600 | 0.7705 | 39 |
+| 10% | greedy | 1200 | 0.8588 | 40 |
+| 10% | random | 1200 | 0.7737 | 38 |
+| 25% | greedy | 3000 | 0.8346 | 40 |
+| 25% | random | 3000 | 0.8251 | 38 |
+| 100% | none | 12000 | 0.8164 | 54 |
+
+**More bank is worse.** Accuracy peaks near 5% and falls away; the full
+12,000-point bank is the **worst** configuration tested (0.8164 against
+0.8711). Keeping every embedding keeps the nuisance variation with it, so an
+anomalous patch finds a near neighbour among memorised clutter. ADR-010 argued
+for 10% as an affordable compromise — the data says subsampling is doing real
+work, which is a stronger claim than the one it made.
+
+**Greedy beats random wherever it matters**: 1% +0.0804, 5% +0.1006, 10% +0.0851, 25% +0.0095.
+The gap collapses at 25%, once *which* quarter you keep stops mattering. Same
+direction as the +3.6-point MVTec result, on a second dataset.
+
+**The fraction is not a latency knob.** 37–40 ms/tile from 1% to 25%,
+rising only at the full bank (54 ms) — the backbone forward dominates
+brute-force NN at these sizes (ADR-011).
+
+Six fabrics, sd ≈ 0.10, so the 1/5/10% cluster is one flat region rather
+than a ranking. The robust findings are the greedy/random direction and the
+decline at 100%.
+
 ## Verification images
 
 `marked/` holds the output of `probes/p09_mark_defects.py` on real AITEX images:

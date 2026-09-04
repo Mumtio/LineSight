@@ -26,9 +26,29 @@ greedy configuration against 10% random at an identical 1,200-point bank and
 against a paper-like 1% — so the *selection method* is justified by our own
 numbers (`results/reproduction.csv`: greedy is worth 3.6 AUROC points for 2.5 s
 of fit time) rather than by argument. The full 1 / 5 / 10 / 25 / 100 % sweep
-for AUROC against latency is designed in `docs/evaluation.md` and **has not been
-run**; the 10% itself therefore still rests on the reasoning above rather than
-on a measured curve.
+ran on 2026-09-04 (`probes/p19_coreset_ablation.py`), and it **changes why this
+decision is right without changing the decision**.
+
+The reasoning above was that 1% would be too sparse for a 30-tile fit set, and
+that more of the bank would be better if we could afford it. Measured on six
+AITEX fabrics, neither holds. 1% greedy reaches 0.8515 tile AUROC against 10%'s
+0.8588 — indistinguishable at this sample size — and accuracy *falls* above
+5%, with the full 12,000-point bank the worst configuration tested
+(0.8164). The coreset is not a lossy compromise we accept for speed; it is
+removing nuisance variation that actively hurts, because a bank holding every
+embedding gives an anomalous patch a near neighbour among memorised clutter.
+
+The latency premise was also wrong. CPU cost is flat at 37–40 ms/tile
+from 1% to 25% and only rises at the full bank (54 ms): brute-force search
+over a few thousand 128-d points is cheap beside the backbone forward pass
+(ADR-011). Shrinking the bank buys artifact size, not speed.
+
+10% therefore stands — it sits inside the flat optimum and keeps the artifact at
+~600 KB — but it is a point in a plateau rather than a tuned value, and 5% is
+the measured peak. Greedy beat random at every bank size where the choice still
+matters (1% +0.0804, 5% +0.1006, 10% +0.0851, 25% +0.0095), converging at 25% once
+*which* quarter is kept stops mattering. That is what keeps k-center the
+default and prices the documented fallback.
 
 ## Consequences
 
