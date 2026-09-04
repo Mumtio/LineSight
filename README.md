@@ -184,7 +184,10 @@ scales as `stability_margin / allowed_frac`; the error message says how much.
 
 ## Results
 
-> The reproduction has run and passed; the rest is study design. See
+> Six of the seven studies have now run in full; the coreset ablation is
+> measured for greedy-vs-random but not for the full fraction sweep. Two results
+> contradicted the specification they were meant to confirm, and are reported as
+> they came out. See
 > [docs/evaluation.md](docs/evaluation.md) for the method, the stated
 > hypotheses, and the threats to validity.
 
@@ -196,8 +199,10 @@ scales as `stability_margin / allowed_frac`; the error message says how much.
 | Ten Fabrics Dataset, 10 cold starts (block / image) | **0.914** / 0.761 mean over fabrics |
 | False alarms against ground truth, Fabric Stain | 1,315–1,391 FP/100 m — see [results/](results/README.md) |
 | Latency per processed frame (laptop CPU, stride 2) | median **478 ms** |
-| Normal-set size at which AUROC flattens | not measured |
-| Supervised U-Net, in-distribution / held-out fabric | not run — [ADR-004](docs/decisions/ADR-004-supervised-baseline-as-the-losing-baseline.md) |
+| Normal-set size at which AUROC flattens | **no knee by 100 tiles** — 30 captures 46% of the 5→100 gain |
+| Supervised U-Net, in-distribution / held-out fabric | 0.773 / 0.628 tile AUROC — PatchCore beats it in **both** |
+| Backbone ablation (tile AUROC, CPU ms/tile) | resnet18 0.859 @ 37 ms · wide_resnet50_2 **0.978** @ 176 ms |
+| Calibration: realised / requested false-alarm rate | **0.98** over 45 resolvable cases; 18 refused as unresolvable |
 
 ## The seam
 

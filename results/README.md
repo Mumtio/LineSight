@@ -112,6 +112,57 @@ physical sample than the one being inspected puts the nuisance variation
 ten minutes of video of one continuous piece of real fabric, which
 `Pipeline.teach_calibrate_inspect` already knows how to learn from.
 
+## Backbone ablation — what the cheap backbone costs
+
+`backbone_ablation.csv`, from `probes/p15_backbone_ablation.py`. Six AITEX
+fabrics, one bank each on 30 defect-free tiles, mean over the six. Accuracy is
+device-independent; latency is measured on CPU because that is the target.
+
+| Backbone | Embed dim | Tile AUROC | Pixel AUROC | CPU ms/tile |
+|---|---|---|---|---|
+| resnet18 (shipped) | 384 | 0.8588 | 0.9710 | 37 |
+| wide_resnet50_2 | 1536 | **0.9781** | **0.9831** | 176 |
+
+**The deeper backbone is worth +0.1193 tile AUROC for 4.8x the CPU cost.** p15 set
+the decision rule in advance at 0.05, and the measured gap is more than double
+it. The specification's claim that resnet18 costs little in accuracy does not
+survive this table. `backbone` is a per-SKU config key, so a line with latency
+headroom can raise it without a code change.
+
+## Normal-set size — the money plot
+
+`normal_set_sweep.csv`, from `probes/p16_normal_set_sweep.py`. Nested fit sets,
+identical evaluation set at every n, mean tile AUROC over six fabrics.
+
+| n tiles | 5 | 10 | 20 | 30 | 50 | 100 |
+|---|---|---|---|---|---|---|
+| Tile AUROC | 0.8242 | 0.8092 | 0.8439 | 0.8563 | 0.8846 | 0.8937 |
+
+**No knee.** 5 to 100 tiles moves tile AUROC +0.0695, and the shipped 30
+captures 46% of it — the 30-to-100 gain (+0.0374) is about the same
+size as the 5-to-30 gain (+0.0321). The spread across fabrics is larger than
+any step, so the honest claim is "no flattening observed by 100 tiles" rather
+than "still climbing". **30 tiles is a working point, not an optimum.**
+
+## Calibration curve — does a stated budget hold on real fabric?
+
+`calibration.csv`, from `probes/p17_calibration_curve.py`. Seven fabrics,
+~350 calibration and ~350 validation tiles each, all disjoint.
+
+Over 45 resolvable cases the realised exceedance fraction tracks the requested
+one: **mean ratio 0.98**, median 0.97, running hot in 21 of 45 — scattered
+either side of 1.0 rather than biased. Where the sample cannot support the
+request the function refuses: 18 of 63 cases, every one of them on the
+stability-margin guard.
+
+**The wall is the real finding.** At the bench rig's scale, resolving 1 FA/100 m
+needs a tail fraction of 1.5e-4 and roughly 70,000 clean tiles — about a
+kilometre of clean fabric. AITEX offers a few hundred per fabric. The
+1 FA/100 m in the whitepaper is a design target the current evidence cannot
+demonstrate, not a measured result. (Tiles were overlapped 192 px to raise the
+count, so the effective sample is smaller still and the refusal boundary above
+is optimistic.)
+
 ## Verification images
 
 `marked/` holds the output of `probes/p09_mark_defects.py` on real AITEX images:

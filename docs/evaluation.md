@@ -4,10 +4,12 @@ Method first, then results. Every number in the README table is generated from
 a CSV in `results/`, and every CSV is written by a named probe or study, so any
 figure traces back to the code that produced it.
 
-> **Status: the reproduction and the fabric studies have run; the remaining
-> tables are study design.** Where a result column is empty, the study has not
-> been run — nothing here is a placeholder for a number that is expected, and
-> where a hypothesis is stated it is labelled as one.
+> **Status: every study in this document has now run** (sections 2, 4, 6 and 7
+> on 2026-09-04; the rest earlier). Two of them contradicted the specification
+> they were designed to confirm — the backbone ablation in section 2 and the
+> supervised baseline in section 6 — and both are reported as they came out.
+> Section 3 remains partially measured: the greedy-vs-random comparison ran,
+> the full coreset-fraction sweep did not.
 
 ## Metrics
 
@@ -88,10 +90,28 @@ wall-clock per tile. Justifies shipping `resnet18` — or overturns it. The
 specification says resnet18 for speed; if the accuracy gap is large this table is
 where we find out and change our minds.
 
-| Backbone | Embed dim | Image AUROC | ms/tile (CPU) | Bank size |
-|---|---|---|---|---|
-| resnet18 | 384 | — | — | — |
-| wide_resnet50_2 | 1536 | — | — | — |
+**Ran 2026-09-04**, on AITEX rather than MVTec: six fabric codes, one bank per
+fabric on its own 30 defect-free tiles, evaluated on that fabric's own defects.
+Mean over the six. Accuracy is device-independent; the millisecond column is
+measured **on CPU** because that is the target the choice was made for.
+
+| Backbone | Embed dim | Tile AUROC | Pixel AUROC | ms/tile (CPU) | Bank size |
+|---|---|---|---|---|---|
+| resnet18 (shipped) | 384 | 0.8588 | 0.9710 | 37 | 1200 |
+| wide_resnet50_2 | 1536 | **0.9781** | **0.9831** | 176 | 1200 |
+
+**This overturns the specification's reasoning, and the decision rule was stated
+before the run.** p15 recorded in advance that a gap above ~0.05 tile AUROC would
+mean resnet18 should be reconsidered. The gap is **+0.1193** — more than
+twice that — for 4.8x the CPU cost per tile. The cheap backbone is not free,
+and the honest summary is that `resnet18` buys latency at a real accuracy price
+rather than at a negligible one.
+
+Two things stop this from being an immediate change of default. The per-tile
+cost is what ADR-009's whole latency extrapolation rests on, and `backbone` is
+already a per-SKU config key — so a mill with headroom can raise it today
+without a code change. What should change is the *claim*: the specification said
+resnet18 costs little, and on this evidence it costs 0.12 tile AUROC.
 
 → `results/backbone_ablation.csv`
 
@@ -130,15 +150,36 @@ observation with an error bar.
 If it does *not* flatten, that is a finding too, and it changes the product
 claim rather than being quietly dropped.
 
-| n images | Image AUROC | Pixel AUPRO |
-|---|---|---|
-| 5 | — | — |
-| 10 | — | — |
-| 20 | — | — |
-| 30 | — | — |
-| 50 | — | — |
+**Ran 2026-09-04.** The unit is **tiles**, not images: `detect.n_normal_tiles`
+is what the product actually parameterises, and one 4096x256 AITEX strip yields
+16 tiles, so a sweep in images would move in 16-tile steps and say nothing about
+the setting an operator can change. Fit sets are nested (the 5-tile set is a
+subset of the 10-tile set) and the evaluation set is identical at every n, so
+the only thing moving along the x-axis is the fit size. Mean over six fabrics.
 
-→ `results/normal_set_sweep.csv`, plotted in the README.
+| n tiles | Tile AUROC | sd across fabrics | Pixel AUROC | Bank |
+|---|---|---|---|---|
+| 5 | 0.8242 | 0.1053 | 0.9380 | 200 |
+| 10 | 0.8092 | 0.1092 | 0.9349 | 400 |
+| 20 | 0.8439 | 0.0868 | 0.9558 | 800 |
+| 30 | 0.8563 | 0.0887 | 0.9709 | 1200 |
+| 50 | 0.8846 | 0.0930 | 0.9740 | 2000 |
+| 100 | 0.8937 | 0.0732 | 0.9763 | 4000 |
+
+**The curve does not flatten by 30, and the honest reading is that the claim as
+written is too strong.** Going from 5 to 100 tiles moves tile AUROC by
++0.0695; the shipped 30 captures 46% of that. There is no knee — the
+gain from 30 to 100 (+0.0374) is roughly the same size as the gain from 5 to 30
+(+0.0321).
+
+The caveat that keeps this from being a verdict: the spread across fabrics
+(sd ~0.09) is larger than every step in the curve. Six fabrics cannot separate
+these means, so the correct statement is "no flattening was observed by 100
+tiles", not "the curve is still climbing". What it does establish is that
+**30 tiles is a working point, not an optimum**, and the whitepaper should say
+that rather than implying the curve has levelled off.
+
+→ `results/normal_set_sweep.csv`
 
 ### 5. Cross-construction generalisation on AITEX
 
@@ -204,23 +245,45 @@ Trained on AITEX's 105 pixel-annotated defective images (ADR-004). Evaluated in
 two conditions against PatchCore, using the same harness — it implements the same
 `AnomalyScorer` protocol, so the swap is two lines.
 
-| | In-distribution | Leave-one-fabric-out |
-|---|---|---|
-| Supervised U-Net | — | — |
-| PatchCore | — | — |
+**Ran 2026-09-04.** 4 fabrics, ~1.9 M-parameter U-Net, 30 epochs, Dice+BCE,
+crops balanced so half contain an annotated defect. All three methods are scored
+on **identical** tiles through the identical AUROC path.
+
+| Method | Saw this construction? | Tile AUROC | Pixel AUROC |
+|---|---|---|---|
+| Supervised U-Net, in-distribution | yes | 0.7726 | 0.7896 |
+| Supervised U-Net, leave-one-fabric-out | no | 0.6277 | 0.6957 |
+| PatchCore, cold start (shipped) | no defect labels at all | **0.8631** | **0.9841** |
 
 **Hypothesis** (recorded before running, so it cannot be retrofitted): the U-Net
 wins in-distribution and collapses on held-out structures; PatchCore sits
-slightly behind in-distribution and holds. The line this buys, if it holds:
+slightly behind in-distribution and holds.
 
-> We trained a fully supervised segmentation model as our upper bound. It beats
-> us by N points on fabrics it has seen and loses by M points on fabrics it
-> hasn't — which is the only case that matters when a mill onboards a new SKU
-> every week.
+**The second half held. The first half did not, and that is reported rather than
+quietly reframed.** The U-Net collapsed on unseen constructions exactly as
+predicted (-0.1449 tile AUROC, and pixel AUROC falling to 0.70), and
+PatchCore beats it there by **+0.2354**. But PatchCore also beat it
+*in-distribution*, by 0.0905 tile AUROC and 0.1946 pixel AUROC — so the
+"supervised upper bound" framing this study was designed around is wrong on this
+data.
 
-If the U-Net generalises better than expected, we report that. The cold-start
-argument stands independently: a labelled corpus per construction does not exist
-in a mill.
+**Do not read that as "supervised learning is worse".** The honest reading is
+that ~50 training images and 30 epochs is a thin budget, and a bigger corpus or
+a longer schedule would likely close the in-distribution gap. What the table
+does support is narrower and still decisive for the product argument:
+
+> A supervised segmentation model trained on every pixel-annotated defect we
+> have does not beat a method that saw no defect labels at all — and on a fabric
+> construction it has never seen, it loses by 0.24 tile AUROC. The
+> cold-start case is the one a mill lives in.
+
+The pixel-level gap is the sharper one: 0.9841 against 0.7896. The U-Net
+finds roughly the right images and marks the wrong pixels, which is the failure
+AUPRO-style metrics exist to expose.
+
+The cold-start argument stands independently of all of this: a labelled corpus
+per construction does not exist in a mill, which is what `UNetScorer.fit`
+says by raising.
 
 → `results/baseline_comparison.csv`, `results/unet_history.csv`
 
@@ -233,9 +296,49 @@ empirically that a stated budget of 1 FA/100 m produces approximately 1 FA/100 m
 Also reports the achievable resolution at each sample size, which is the guard
 that stops the method from quoting a rate the sample cannot support.
 
-| Budget (FA/100 m) | Threshold | Realised FA/100 m | n clean tiles | Achievable resolution |
+**Ran 2026-09-04.** Seven fabrics, ~350 calibration and ~350 validation tiles
+each, disjoint from each other and from the 30 fit tiles.
+
+The x-axis is the **allowed tail fraction**, not a rate per 100 m, and that is
+deliberate. The conformal guarantee is a statement about a quantile of the
+clean-score distribution; turning it into a rate needs `metres_per_tile`, which
+is a property of the rig rather than of the method, and AITEX strips carry no
+scale. The second column converts using the value this project's own bench rig
+measured, and exists only to connect the two.
+
+| Requested tail fraction | = FA/100 m at bench scale | Fabrics resolved | Realised fraction | Realised / requested |
 |---|---|---|---|---|
-| 0.5 / 1 / 2 / 5 | — | — | — | — |
+| 0.005 | 33 | 0/7 | refused | — |
+| 0.010 | 67 | 0/7 | refused | — |
+| 0.020 | 133 | 3/7 | 0.0192 | 0.96 |
+| 0.030 | 200 | 7/7 | 0.0270 | 0.90 |
+| 0.050 | 333 | 7/7 | 0.0478 | 0.96 |
+| 0.075 | 500 | 7/7 | 0.0755 | 1.01 |
+| 0.100 | 666 | 7/7 | 0.1030 | 1.03 |
+| 0.150 | 999 | 7/7 | 0.1494 | 1.00 |
+| 0.200 | 1,332 | 7/7 | 0.1959 | 0.98 |
+
+**Both halves of ADR-007 hold on real fabric.** Where the sample can resolve the
+request, the realised exceedance tracks it: mean ratio **0.98**, median
+0.97 over 45 resolvable cases, running hot in 21 of 45 — scattered either
+side of 1.0 rather than biased, which is what "derived, not chosen" has to mean
+to be worth anything. And where the sample cannot support the request, the
+function **refuses**: 18 of 63 cases, all 18 of them tripping the
+stability-margin guard rather than the cruder existence check.
+
+**The wall is the finding, and it is not flattering.** At bench scale a tail
+fraction of 0.03 is already ~200 FA/100 m. Resolving the 1 FA/100 m the
+whitepaper quotes needs a tail fraction of 1.5e-4 and, with the default
+stability margin of 10, on the order of 70,000 clean tiles — about a kilometre
+of clean fabric. AITEX gives a few hundred tiles per fabric. This is the same
+arithmetic that made the bench rig calibrate at 40 FA/100 m rather than at 1,
+and it means **the 1 FA/100 m figure is a design target the current evidence
+cannot yet demonstrate**, not a measured result.
+
+One caveat, stated because it inflates the sample: tiles were cut with 192 px
+overlap to raise the count, so neighbouring tiles are correlated and the
+effective sample size is smaller than the tile count. That makes the refusal
+boundary above *optimistic* — the real one sits at coarser fractions.
 
 → `results/calibration.csv`
 

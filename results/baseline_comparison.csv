@@ -1,0 +1,13 @@
+fabric,method,supervised,saw_this_construction,tile_auroc,pixel_auroc,n_clean_test,n_defect
+01,unet_in_dist,True,True,0.7596,0.9537,120,20
+01,unet_lofo,True,False,0.5392,0.9174,120,20
+01,patchcore,False,True,0.9771,0.9798,120,20
+02,unet_in_dist,True,True,0.8653,0.753,120,24
+02,unet_lofo,True,False,0.5153,0.5804,120,24
+02,patchcore,False,True,0.7583,0.9776,120,24
+03,unet_in_dist,True,True,0.6545,0.6389,120,44
+03,unet_lofo,True,False,0.5841,0.4673,120,44
+03,patchcore,False,True,0.953,0.9812,120,44
+04,unet_in_dist,True,True,0.8111,0.8128,120,6
+04,unet_lofo,True,False,0.8722,0.8176,120,6
+04,patchcore,False,True,0.7639,0.998,120,6

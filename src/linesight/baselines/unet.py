@@ -19,9 +19,8 @@ whether an approach is deployable there at all.
 **Not shipped.** A supervised model needs pixel-annotated defects for every
 construction, and that corpus does not exist in a mill - which is exactly what
 ``UNetScorer.fit`` says by raising. This module fixes the architecture, the loss
-and the training protocol; the bodies raise ``NotImplementedError`` because the
-training needs a GPU and AITEX's 105 pixel-annotated defective images, and has
-not been run. Its output would be one row of the results table rather than an
+and the training protocol; ``probes/p18_unet_baseline.py`` trains it and writes
+one row of the results table. The output is a comparison number, not an
 artifact in ``banks/``.
 """
 
@@ -40,10 +39,18 @@ class DoubleConv(nn.Module):
     """(conv 3x3 -> BN -> ReLU) x2. The U-Net block, nothing exotic."""
 
     def __init__(self, in_ch: int, out_ch: int) -> None:
-        raise NotImplementedError
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(in_ch, out_ch, 3, padding=1, bias=False),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_ch, out_ch, 3, padding=1, bias=False),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True),
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError
+        return self.block(x)
 
 
 class UNet(nn.Module):
@@ -54,12 +61,47 @@ class UNet(nn.Module):
     exists to measure honestly.
     """
 
-    def __init__(self, in_ch: int = 3, base_ch: int = 32, depth: int = 4) -> None:
-        raise NotImplementedError
+    def __init__(self, in_ch: int = 3, base_ch: int = 16, depth: int = 4) -> None:
+        super().__init__()
+        self.depth = depth
+        self.downs = nn.ModuleList()
+        self.ups = nn.ModuleList()
+        self.upconvs = nn.ModuleList()
+        self.pool = nn.MaxPool2d(2)
+
+        channels = in_ch
+        widths = [base_ch * 2**i for i in range(depth)]
+        for width in widths:
+            self.downs.append(DoubleConv(channels, width))
+            channels = width
+
+        self.bottleneck = DoubleConv(channels, channels * 2)
+        channels *= 2
+
+        for width in reversed(widths):
+            self.upconvs.append(nn.ConvTranspose2d(channels, width, 2, stride=2))
+            self.ups.append(DoubleConv(width * 2, width))
+            channels = width
+
+        self.head = nn.Conv2d(channels, 1, kernel_size=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """(N, C, H, W) -> (N, 1, H, W) logits. No sigmoid - the loss applies it."""
-        raise NotImplementedError
+        skips = []
+        for down in self.downs:
+            x = down(x)
+            skips.append(x)
+            x = self.pool(x)
+
+        x = self.bottleneck(x)
+
+        for upconv, up, skip in zip(self.upconvs, self.ups, reversed(skips), strict=True):
+            x = upconv(x)
+            if x.shape[-2:] != skip.shape[-2:]:
+                x = nn.functional.interpolate(x, size=skip.shape[-2:], mode="nearest")
+            x = up(torch.cat([skip, x], dim=1))
+
+        return self.head(x)
 
 
 def dice_bce_loss(
@@ -71,7 +113,57 @@ def dice_bce_loss(
     predict all-background and call it 99% accurate. Dice is what forces it to
     actually segment.
     """
-    raise NotImplementedError
+    bce = nn.functional.binary_cross_entropy_with_logits(logits, target)
+    probs = torch.sigmoid(logits)
+    intersection = (probs * target).sum(dim=(1, 2, 3))
+    denominator = probs.sum(dim=(1, 2, 3)) + target.sum(dim=(1, 2, 3))
+    dice = 1.0 - (2.0 * intersection + eps) / (denominator + eps)
+    return (1.0 - dice_weight) * bce + dice_weight * dice.mean()
+
+
+def _sample_crops(
+    images: list[np.ndarray],
+    masks: list[np.ndarray],
+    crop: int,
+    count: int,
+    rng: np.random.Generator,
+    defect_fraction: float = 0.5,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Draw ``count`` crops, half of them centred on an annotated defect pixel.
+
+    A uniformly random crop of a 4096x256 strip almost never contains the
+    defect, so uniform sampling would train the model on background and produce
+    a baseline too weak to be worth comparing against. Balancing the draw is
+    what makes this a fair opponent rather than a strawman - and it is a choice
+    that flatters the baseline, which is the right direction for a comparison
+    the shipped method is meant to survive.
+    """
+    xs, ys = [], []
+    for _ in range(count):
+        idx = int(rng.integers(len(images)))
+        image, mask = images[idx], masks[idx]
+        h, w = mask.shape[:2]
+        ch, cw = min(crop, h), min(crop, w)
+
+        defect_pixels = np.argwhere(mask > 0)
+        if len(defect_pixels) and rng.random() < defect_fraction:
+            cy, cx = defect_pixels[int(rng.integers(len(defect_pixels)))]
+            top = int(np.clip(cy - ch // 2, 0, max(h - ch, 0)))
+            left = int(np.clip(cx - cw // 2, 0, max(w - cw, 0)))
+        else:
+            top = int(rng.integers(0, max(h - ch, 0) + 1))
+            left = int(rng.integers(0, max(w - cw, 0) + 1))
+
+        tile = image[top : top + ch, left : left + cw]
+        tile_mask = mask[top : top + ch, left : left + cw]
+        if tile.ndim == 2:
+            tile = np.repeat(tile[:, :, None], 3, axis=2)
+        xs.append(tile.astype(np.float32) / 255.0)
+        ys.append((tile_mask > 0).astype(np.float32))
+
+    x = torch.from_numpy(np.stack(xs)).permute(0, 3, 1, 2).contiguous()
+    y = torch.from_numpy(np.stack(ys)).unsqueeze(1).contiguous()
+    return x, y
 
 
 def train_unet(
@@ -92,7 +184,35 @@ def train_unet(
     be reclaimed at any moment, and a metric that only reached stdout is lost
     with it.
     """
-    raise NotImplementedError
+    if not images:
+        raise ValueError("no training images - a supervised baseline needs labels")
+
+    torch.manual_seed(seed)
+    rng = np.random.default_rng(seed)
+    dev = torch.device(device if (device == "cpu" or torch.cuda.is_available()) else "cpu")
+
+    model = UNet().to(dev)
+    optimiser = torch.optim.Adam(model.parameters(), lr=lr)
+    steps = max(1, len(images) // batch_size)
+
+    history: list[dict] = []
+    for epoch in range(1, epochs + 1):
+        model.train()
+        total = 0.0
+        for _ in range(steps):
+            x, y = _sample_crops(images, masks, crop, batch_size, rng)
+            x, y = x.to(dev), y.to(dev)
+            optimiser.zero_grad(set_to_none=True)
+            loss = dice_bce_loss(model(x), y)
+            loss.backward()
+            optimiser.step()
+            total += float(loss.detach())
+        record = {"epoch": epoch, "loss": round(total / steps, 5), "steps": steps}
+        history.append(record)
+        if log_every and epoch % log_every == 0:
+            print(f"  epoch {epoch:>3}/{epochs}  loss {record['loss']:.5f}", flush=True)
+
+    return model, history
 
 
 class UNetScorer:
@@ -107,7 +227,11 @@ class UNetScorer:
     def __init__(
         self, model: UNet | None = None, device: str = "cuda", input_size: int = 256
     ) -> None:
-        raise NotImplementedError
+        self.device = torch.device(
+            device if (device == "cpu" or torch.cuda.is_available()) else "cpu"
+        )
+        self.input_size = input_size
+        self.model = model.to(self.device).eval() if model is not None else None
 
     def fit(self, normal_tiles: list[np.ndarray]) -> None:
         """Raises ``NotImplementedError`` - and the raise is the point.
@@ -119,17 +243,55 @@ class UNetScorer:
         behaviour rather than prose - anything that tries to cold-start this
         scorer fails immediately, and says why.
         """
-        raise NotImplementedError
+        raise NotImplementedError(
+            "UNetScorer cannot be fitted from defect-free tiles. A supervised "
+            "model needs pixel-annotated defects for this construction, which is "
+            "the corpus a mill does not have. Use train_unet() with labelled "
+            "data, or use PatchCore, which does cold-start. See ADR-004."
+        )
 
     def score(self, tile: np.ndarray) -> np.ndarray:
-        raise NotImplementedError
+        return self.score_batch([tile])[0]
 
     def score_batch(self, tiles: list[np.ndarray]) -> list[np.ndarray]:
-        raise NotImplementedError
+        if self.model is None:
+            raise RuntimeError("UNetScorer has no model - train_unet() or load() first")
+
+        batch = []
+        for tile in tiles:
+            array = tile
+            if array.ndim == 2:
+                array = np.repeat(array[:, :, None], 3, axis=2)
+            batch.append(array.astype(np.float32) / 255.0)
+
+        shapes = [b.shape[:2] for b in batch]
+        x = torch.from_numpy(np.stack(batch)).permute(0, 3, 1, 2).to(self.device)
+        with torch.no_grad():
+            logits = self.model(x)
+
+        maps = []
+        for i, (h, w) in enumerate(shapes):
+            single = logits[i : i + 1]
+            if single.shape[-2:] != (h, w):
+                single = nn.functional.interpolate(
+                    single, size=(h, w), mode="bilinear", align_corners=False
+                )
+            maps.append(single[0, 0].cpu().numpy().astype(np.float32))
+        return maps
 
     def save(self, path: str | Path) -> None:
-        raise NotImplementedError
+        if self.model is None:
+            raise RuntimeError("nothing to save - UNetScorer has no model")
+        destination = Path(path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(
+            {"state_dict": self.model.state_dict(), "input_size": self.input_size},
+            destination,
+        )
 
     @classmethod
     def load(cls, path: str | Path, device: str = "cuda") -> UNetScorer:
-        raise NotImplementedError
+        payload = torch.load(Path(path), map_location="cpu", weights_only=True)
+        model = UNet()
+        model.load_state_dict(payload["state_dict"])
+        return cls(model=model, device=device, input_size=int(payload["input_size"]))

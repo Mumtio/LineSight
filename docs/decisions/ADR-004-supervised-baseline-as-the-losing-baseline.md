@@ -35,8 +35,19 @@ deployed there regardless of how well it generalises. `UNetScorer.fit` raises
 in executable code rather than in prose.
 
 The baseline is **not shipped**. Its home is `baselines/` and one row in the
-results table. As of 2026-09-04 that row is **not yet measured**: `unet.py`
-fixes the architecture, the loss and the training protocol, but the training
-itself needs a GPU and AITEX's 105 pixel-annotated defective images, and has not
-been run. The argument above stands on the cold-start constraint, which is
-independent of the numbers; the comparison remains outstanding.
+results table.
+
+**Measured 2026-09-04** by `probes/p18_unet_baseline.py` (`unet.py` no longer
+stubs its training). The recorded hypothesis was that the U-Net would win
+in-distribution and collapse on unseen constructions. It collapsed as predicted
+— 0.628 tile AUROC against PatchCore's 0.863 on a construction it had
+never seen — but it also **lost in-distribution** (0.773), which the
+hypothesis did not predict.
+
+That is reported rather than reframed, and it is deliberately not read as
+"supervised learning is worse": ~50 training images and 30 epochs is a thin
+budget and a larger corpus would likely close the in-distribution gap. The
+decision above does not rest on the numbers in any case. It rests on the
+cold-start constraint — a labelled corpus per construction does not exist in a
+mill — which is why `UNetScorer.fit` still raises. See `docs/evaluation.md`
+section 6.
